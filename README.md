@@ -95,9 +95,24 @@ and the ports 8001 and 8002.
 
 ### Without Docker: GitHub Actions
 
-The [Demo workflow](.github/workflows/demo.yml) runs both scripts on a GitHub
-runner. Start it with the **Run workflow** button in the Actions tab, or with
-`gh workflow run demo.yml`, and read the output in the job logs.
+Each example has its own workflow, which runs the script on a GitHub runner:
+
+| Workflow | Runs | Example of a successful run |
+|---|---|---|
+| [Demo: 2 nodes](.github/workflows/demo-2nodes.yml) | `demo-2nodes.sh` | [run 45266714413](https://github.com/viniciuskneves/cap-theorem-example/actions/runs/45266714413/job/138015453902) |
+| [Demo: 3 nodes](.github/workflows/demo-3nodes.yml) | `demo-3nodes.sh` | [run 45266720445](https://github.com/viniciuskneves/cap-theorem-example/actions/runs/45266720445/job/138015474857) |
+
+To find the results in a run, open its job and expand the step named
+**Run demo-2nodes.sh** (or **Run demo-3nodes.sh**). The output is the same as
+running the script locally: a `=== CP mode ===` block followed by an
+`=== AP mode ===` block, with one line per request showing the status code and
+the response.
+
+GitHub deletes run logs after 90 days, so the example links above will stop
+showing output eventually. To get a fresh run, use the **Run workflow** button
+in the [Actions tab](https://github.com/viniciuskneves/cap-theorem-example/actions),
+or `gh workflow run demo-2nodes.yml` / `gh workflow run demo-3nodes.yml`.
+The workflows only start manually.
 
 The scripts print what happens but do not check it, so a green run only means
 the demo ran to the end.
