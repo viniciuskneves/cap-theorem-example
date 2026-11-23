@@ -93,6 +93,15 @@ and ZooKeeper behave.
 Run one example at a time: both use the container names `node-a` and `node-b`
 and the ports 8001 and 8002.
 
+### Without Docker: GitHub Actions
+
+The [Demo workflow](.github/workflows/demo.yml) runs both scripts on a GitHub
+runner. Start it with the **Run workflow** button in the Actions tab, or with
+`gh workflow run demo.yml`, and read the output in the job logs.
+
+The scripts print what happens but do not check it, so a green run only means
+the demo ran to the end.
+
 ## Playing with it by hand
 
 ```sh
