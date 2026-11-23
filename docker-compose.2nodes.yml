@@ -1,0 +1,73 @@
+# Two identical nodes running server.js.
+#
+# This is not the default compose file name, so every command needs "-f":
+#
+# Start with:   MODE=CP docker compose -f docker-compose.2nodes.yml up -d --force-recreate
+#               (or MODE=AP)
+# Partition:    docker network disconnect cap-cluster node-b
+# Heal:         docker network connect cap-cluster node-b
+# Stop:         docker compose -f docker-compose.2nodes.yml down
+#
+# Do not run this together with docker-compose.3nodes.yml: both use the
+# container names node-a and node-b and the host ports 8001 and 8002.
+
+# Shared settings for every node. Compose ignores top-level keys that start
+# with "x-", so this block only exists to be reused: "&node" names it, and
+# "<<: *node" below pastes it into each service.
+x-node: &node
+  # Official Node.js 22 image on Alpine Linux (small). server.js has no
+  # dependencies, so there is nothing to install and no Dockerfile to build.
+  image: node:22-alpine
+  # The process the container runs.
+  command: node /app/server.js
+  # Mount server.js from this folder into the container, read-only (":ro").
+  # Edit the file, recreate the containers, and the change is live.
+  volumes:
+    - ./server.js:/app/server.js:ro
+
+services:
+  # The service name doubles as the hostname other containers use to reach it.
+  node-a:
+    <<: *node
+    # Fixed container name, so the docker network commands above stay short.
+    # It must match the hostname used in PEERS: after a manual
+    # "docker network connect", only the container name is registered in DNS.
+    container_name: node-a
+    environment:
+      # Label the node puts in every response.
+      NODE_NAME: node-a
+      # Comma-separated list of the OTHER nodes. 8000 is the port inside the
+      # container, not the one published on your machine.
+      PEERS: http://node-b:8000
+      # Taken from your shell when you run "docker compose up"; CP if unset.
+      MODE: ${MODE:-CP}
+    # host:container. This node is http://localhost:8001 on your machine.
+    ports: ["8001:8000"]
+    # client-a: how your machine reaches this node.
+    # cluster:  how the nodes reach each other.
+    networks: [client-a, cluster]
+
+  node-b:
+    <<: *node
+    container_name: node-b
+    environment:
+      NODE_NAME: node-b
+      PEERS: http://node-a:8000
+      MODE: ${MODE:-CP}
+    ports: ["8002:8000"]
+    networks: [client-b, cluster]
+
+networks:
+  # One client network PER node. If the nodes shared a client network they
+  # could still talk through it, and the partition would be fake.
+  client-a:
+  client-b:
+
+  # The only network the nodes share, so all node-to-node traffic uses it.
+  # Disconnecting a node from this network IS the partition.
+  cluster:
+    # Fixed name. Without it Compose would call it "cap-demo_cluster".
+    name: cap-cluster
+    # No route to the host: published ports must go through the client
+    # networks, so they keep working while a node is cut off from the cluster.
+    internal: true
