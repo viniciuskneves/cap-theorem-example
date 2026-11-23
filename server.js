@@ -13,6 +13,7 @@
 //            (Available, but not consistent.)
 
 const http = require('node:http');
+const dns = require('node:dns');
 
 // ---------- configuration ----------
 
@@ -61,6 +62,24 @@ function merge(key, incoming) {
 
 // ---------- talking to peers ----------
 
+// Turn a peer's hostname into an IP address by asking the DNS server directly.
+//
+// Why not Node's default lookup? The default runs on a pool of only 4 threads
+// and blocks one of them until the system resolver gives up. During a
+// partition the cut-off node's name no longer resolves, and on some Docker
+// setups (Linux, for one) each attempt hangs for seconds. A few of those fill
+// the pool, lookups for HEALTHY peers get stuck in the queue behind them, and
+// the node wrongly concludes that everyone is unreachable.
+// dns.resolve4 does not use that pool, so a slow lookup only delays itself.
+function lookupPeer(hostname, options, callback) {
+  dns.resolve4(hostname, (err, addresses) => {
+    if (err) return callback(err);
+    // Depending on its settings, Node asks for one address or for all of them.
+    if (options.all) return callback(null, addresses.map((address) => ({ address, family: 4 })));
+    callback(null, addresses[0], 4);
+  });
+}
+
 // Send one request to one peer and resolve with its JSON reply.
 // Rejects if the peer is unreachable, too slow, or answers with an error.
 //
@@ -71,7 +90,12 @@ function callPeer(peer, path, body) {
   return new Promise((resolve, reject) => {
     const req = http.request(
       peer + path,
-      { method: 'POST', agent: false, headers: { 'content-type': 'application/json' } },
+      {
+        method: 'POST',
+        agent: false,
+        lookup: lookupPeer,
+        headers: { 'content-type': 'application/json' },
+      },
       (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
